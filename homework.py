@@ -86,8 +86,8 @@ def parse_status(homework):
     if 'homework_name' not in homework:
         raise Exception('Не получил ключ homework')
     if homework['status'] not in HOMEWORK_VERDICTS:
-        logging.error
-        ('Неожиданный статус домашней работы, обнаруженный в ответе API ')
+        logging.error('Неожиданный статус домашней работы,'
+                      'обнаруженный в ответе API ')
         raise Exception()
     hw_name = homework['homework_name']
     verdict = HOMEWORK_VERDICTS[homework["status"]]
