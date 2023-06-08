@@ -1,38 +1,31 @@
 import requests
 import os
 import logging
-from telegram import Bot
 import time
+
+from telegram import Bot
 from dotenv import load_dotenv
 
 
 load_dotenv()
 
-logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=logging.DEBUG)
-
 PRACTICUM_TOKEN = os.getenv('PRACTICUM_TOKEN')
 TELEGRAM_TOKEN = os.getenv('BOT_TOKEN')
 TELEGRAM_CHAT_ID = os.getenv('CHAT_ID')
-
-RETRY_PERIOD = 600
-ENDPOINT = 'https://practicum.yandex.ru/api/user_api/homework_statuses/'
-HEADERS = {'Authorization': f'OAuth {PRACTICUM_TOKEN}'}
-
-
-HOMEWORK_VERDICTS = {
+RETRY_PERIOD: int = 600
+ENDPOINT: str = 'https://practicum.yandex.ru/api/user_api/homework_statuses/'
+HEADERS: dict = {'Authorization': f'OAuth {PRACTICUM_TOKEN}'}
+HOMEWORK_VERDICTS: list = {
     'approved': 'Работа проверена: ревьюеру всё понравилось. Ура!',
     'reviewing': 'Работа взята на проверку ревьюером.',
     'rejected': 'Работа проверена: у ревьюера есть замечания.'
 }
+VALID_KEYS: dict = ['homeworks', 'current_date']
 
-VALID_KEYS = ['homeworks', 'current_date']
 
-
-def check_tokens():
+def check_tokens() -> None:
     """Проверка наличия токенов."""
-    tokens = [PRACTICUM_TOKEN, TELEGRAM_CHAT_ID, TELEGRAM_TOKEN]
+    tokens: list = [PRACTICUM_TOKEN, TELEGRAM_CHAT_ID, TELEGRAM_TOKEN]
     for token in tokens:
         if not token:
             logging.critical(f'Отсутствует обязательная'
@@ -42,21 +35,20 @@ def check_tokens():
             raise ValueError('no token')
 
 
-def send_message(bot, message):
+def send_message(bot, message) -> None:
     """Отправляет сообщение в телеграм."""
     try:
-
         bot.send_message(chat_id=TELEGRAM_CHAT_ID, text=message)
         logging.debug('сообщение отправлено')
     except Exception as error:
         logging.error(f'оишбка при отправке сообщения {error}')
 
 
-def get_api_answer(timestamp):
+def get_api_answer(timestamp) -> dict:
     """Получает ответ от апи Яндекс."""
-    url = ENDPOINT
-    headers = HEADERS
-    params = {'from_date': timestamp}
+    url: str = ENDPOINT
+    headers: dict = HEADERS
+    params: dict = {'from_date': timestamp}
     try:
         response = requests.get(url, headers=headers, params=params)
     except requests.RequestException:
@@ -64,10 +56,10 @@ def get_api_answer(timestamp):
     if response.status_code == 200:
         return response.json()
     else:
-        raise Exception
+        raise ConnectionError
 
 
-def check_response(response):
+def check_response(response) -> dict:
     """Проверяет полученный ответ."""
     if type(response) is not dict:
         raise TypeError
@@ -81,7 +73,7 @@ def check_response(response):
     return response
 
 
-def parse_status(homework):
+def parse_status(homework) -> str:
     """Проверка статуса домашней работы."""
     if 'homework_name' not in homework:
         raise Exception('Не получил ключ homework')
@@ -89,27 +81,33 @@ def parse_status(homework):
         logging.error('Неожиданный статус домашней работы,'
                       'обнаруженный в ответе API ')
         raise Exception()
-    hw_name = homework['homework_name']
-    verdict = HOMEWORK_VERDICTS[homework["status"]]
+    hw_name: str = homework['homework_name']
+    verdict: str = HOMEWORK_VERDICTS[homework["status"]]
     return (f'Изменился статус проверки работы "{hw_name}".{verdict}')
 
 
 def main():
     """Основная логика работы бота."""
+    logging.basicConfig(
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        level=logging.DEBUG)
+
     check_tokens()
     bot = Bot(token=TELEGRAM_TOKEN)
-    timestamp = int(time.time())
-    print(timestamp)
-    check_status = ''
+    timestamp: int = int(time.time())
+    check_status: str = ''
     while True:
         try:
             response = get_api_answer(timestamp)
+            print(response)
             check_response(response)
+            timestamp: int = response['current_date']
             if response:
-                homework = response['homeworks'][0]
+                homework: str = response['homeworks'][0]
+                print(homework)
                 if homework['status'] != check_status:
-                    message = parse_status(homework)
-                    check_status = homework['status']
+                    message: str = parse_status(homework)
+                    check_status: str = homework['status']
                     send_message(bot, message)
 
         except TypeError:
